@@ -1,0 +1,10 @@
+/checkpoints
+target_strings_full.jl
+train_pharagraph_full.jl
+/__pycache__
+log.txt
+word2Topic_v1.jl
+word2Topic_v2.jl
+word2Topic.jl
+list_topic_count.jl
+test.ipynb
