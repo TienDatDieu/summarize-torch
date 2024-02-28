@@ -11,10 +11,8 @@ class BertLayer(nn.Module):
         self.bert = bert
 
     def forward(self, inputs):
-        print(inputs[1])
-        print(self.bert(**inputs))
-        result = self.bert(**inputs).last_hidden_state
-        return result
+        result = self.bert(**inputs)
+        return result['last_hidden_state']
 
 # # Example usage:
 # # Load a pre-trained BERT model

@@ -3,6 +3,33 @@ import re
 import pandas as pd
 import torch
 from config import *
+from torch.utils.data import Dataset
+
+class MyDataset(Dataset):
+    def __init__(self, inputs,targets):
+        super().__init__()
+        self.inputs = inputs
+        self.targets = targets
+
+    def __len__(self):
+        return len(self.inputs['input_ids'])
+    
+    def __getitem__(self, index):
+        inp_input_ids = self.inputs['input_ids'][index]
+        inp_token_type_ids = self.inputs['token_type_ids'][index]
+        inp_attention_mask = self.inputs['attention_mask'][index]
+        tar_input_ids = self.targets['input_ids'][index]
+        tar_token_type_ids = self.targets['token_type_ids'][index]
+        tar_attention_mask = self.targets['attention_mask'][index]
+
+        return {
+            'inp_input_ids' : inp_input_ids,
+            'inp_token_type_ids' : inp_token_type_ids,
+            'inp_attention_mask' : inp_attention_mask,
+            'tar_input_ids' : tar_input_ids,
+            'tar_token_type_ids' : tar_token_type_ids,
+            'tar_attention_mask' : tar_attention_mask,
+        }
 
 def read_data(tokenizer, filetrain='train_pharagraph_full.jl', filetarget='target_strings_full.jl'):
     train_pharagraph = joblib.load(filetrain)
@@ -46,7 +73,7 @@ def read_data(tokenizer, filetrain='train_pharagraph_full.jl', filetarget='targe
     inputs = tokenizer(doc_list, return_tensors="pt", padding=True, max_length = encoder_maxlen, truncation = True)
     targets = tokenizer(sum_list, return_tensors="pt", padding=True, max_length = decoder_maxlen, truncation = True)
 
-    dataset = torch.utils.data.TensorDataset([inputs, targets])
+    dataset = MyDataset(inputs[:,:512], targets[:,:512])
     dataloader = torch.utils.data.DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True)
 
     return dataloader, doc_list, sum_list

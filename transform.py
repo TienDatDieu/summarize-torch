@@ -63,9 +63,16 @@ class TransformerModel(nn.Module):
         self.word2Topic = word2Topic
         self.list_topic_count = list_topic_count
     
-    def forward(self, inp, tar, training, enc_padding_mask, look_ahead_mask, dec_padding_mask, alpha=0):
+    def forward(self, inp_input_ids,inp_token_type_ids,inp_attention_mask, tar_input_ids, enc_padding_mask, look_ahead_mask, dec_padding_mask, alpha=0):
+        inp = dict()
+        inp["input_ids"] = inp_input_ids
+        inp["token_type_ids"] = inp_token_type_ids
+        inp["attention_mask"] = inp_attention_mask
+        tar = dict()
+        tar["input_ids"] = tar_input_ids
+
         enc_output = self.encoder(inp)
-        dec_output, attention_weights = self.decoder(tar, enc_output, training, look_ahead_mask, dec_padding_mask)
+        dec_output, attention_weights = self.decoder(tar_input_ids, enc_output["input_ids"], look_ahead_mask, dec_padding_mask)
         
         final_output = self.final_layer(dec_output)
         full_topic = []

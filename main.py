@@ -99,13 +99,11 @@ def evaluate_beam(input_document, n_best, k_beam, transformer):
     decoded_batch.append(best_hypotheses)
     return decoded_batch
 
-def train_step(inp, tar, transformer, optimizer, scheduler):
-    tar_inp = tar[:, :-1]
-    tar_real = tar[:, 1:]
-    enc_padding_mask, combined_mask, dec_padding_mask = create_masks(inp, tar_inp)
+def train_step(inp_input_ids,inp_token_type_ids,inp_attention_mask, tar_input_ids, transformer, optimizer, scheduler):
+    tar_real = tar_input_ids
+    enc_padding_mask, combined_mask, dec_padding_mask = create_masks(inp_input_ids, tar_input_ids)
     predictions, enc_output, att_weights = transformer(
-        inp, tar_inp, 
-        True, 
+        inp_input_ids,inp_token_type_ids,inp_attention_mask, tar_input_ids, 
         enc_padding_mask, 
         combined_mask, 
         dec_padding_mask,
@@ -126,9 +124,9 @@ def train(transformer, optimizer, scheduler):
         print("Epoch {}".format(epoch))
         start = time.time()
         train_loss.clear()
-        for batch, (inp, tar) in enumerate(dataset):
-            inp, tar = inp.to(device), tar.to(device)
-            train_step(inp, tar, transformer, optimizer, scheduler)
+        for batch, row in enumerate(dataset):
+            inp_input_ids,inp_token_type_ids,inp_attention_mask, tar_input_ids = row['inp_input_ids'].to(device), row['inp_token_type_ids'].to(device), row['inp_attention_mask'].to(device), row['tar_input_ids'].to(device)
+            train_step( inp_input_ids, inp_token_type_ids, inp_attention_mask, tar_input_ids , transformer, optimizer, scheduler)
             if batch > 0 and batch % 1000 == 0:
                 print('Batch {} Loss {:.4f}'.format(batch, sum(train_loss) / len(train_loss)))
         print('Epoch {} Loss {:.4f}'.format(epoch, sum(train_loss) / len(train_loss)))

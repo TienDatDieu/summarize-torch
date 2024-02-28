@@ -17,7 +17,7 @@ class Decoder(nn.Module):
         self.dec_layers = nn.ModuleList([DecoderLayer(d_model, num_heads, dff, rate) for _ in range(num_layers)])
         self.dropout = nn.Dropout(rate)
     
-    def forward(self, x, enc_output, training, look_ahead_mask, padding_mask):
+    def forward(self, x, enc_output, look_ahead_mask, padding_mask):
         seq_len = x.size(1)
         attention_weights = {}
         x = self.embedding(x)
@@ -26,7 +26,7 @@ class Decoder(nn.Module):
         x = self.dropout(x)
 
         for i in range(self.num_layers):
-            x, block1, block2 = self.dec_layers[i](x, enc_output, training, look_ahead_mask, padding_mask)
+            x, block1, block2 = self.dec_layers[i](x, enc_output, look_ahead_mask, padding_mask)
             attention_weights[f'decoder_layer{i+1}_block1'] = block1
             attention_weights[f'decoder_layer{i+1}_block2'] = block2
         return x, attention_weights

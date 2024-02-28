@@ -21,7 +21,7 @@ class DecoderLayer(nn.Module):
         self.dropout3 = nn.Dropout(rate)
     
     
-    def forward(self, x, enc_output, training, look_ahead_mask, padding_mask):
+    def forward(self, x, enc_output, look_ahead_mask, padding_mask):
         dec_output, attn_weights_block1 = self.mha1(x, x, x, look_ahead_mask)
         dec_output = self.dropout1(dec_output)
         out1 = self.layernorm1(dec_output + x)
