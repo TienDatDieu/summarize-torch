@@ -126,7 +126,7 @@ def train(transformer, optimizer, scheduler):
         train_loss.clear()
         for batch, row in enumerate(dataset):
             inp_input_ids,inp_token_type_ids,inp_attention_mask, tar_input_ids = row['inp_input_ids'].to(device), row['inp_token_type_ids'].to(device), row['inp_attention_mask'].to(device), row['tar_input_ids'].to(device)
-            train_step( inp_input_ids, inp_token_type_ids, inp_attention_mask, tar_input_ids , transformer, optimizer, scheduler)
+            train_step( inp_input_ids.to(device), inp_token_type_ids.to(device), inp_attention_mask, tar_input_ids , transformer, optimizer, scheduler)
             if batch > 0 and batch % 1000 == 0:
                 print('Batch {} Loss {:.4f}'.format(batch, sum(train_loss) / len(train_loss)))
         print('Epoch {} Loss {:.4f}'.format(epoch, sum(train_loss) / len(train_loss)))
