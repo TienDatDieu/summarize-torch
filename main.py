@@ -11,8 +11,9 @@ from log_manager import *
 from queue import PriorityQueue
 
 from transformers import AutoTokenizer, AutoModelForMaskedLM
+from transformers import BertModel
 tokenizer = AutoTokenizer.from_pretrained("vinai/phobert-base-v2")
-model = AutoModelForMaskedLM.from_pretrained("vinai/phobert-base-v2")
+model = BertModel.from_pretrained("vinai/phobert-base-v2")
 
 
 train_loss = []
