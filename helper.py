@@ -109,7 +109,7 @@ def create_look_ahead_mask(size):
     mask = 1 - torch.tril(torch.ones(size, size))
     return mask
 
-def create_masks(inp, tar, device):
+def create_masks(inp, tar):
     enc_padding_mask = create_padding_mask(inp)
     dec_padding_mask = create_padding_mask(inp)
     look_ahead_mask = create_look_ahead_mask(tar.size(1))
