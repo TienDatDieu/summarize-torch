@@ -12,7 +12,6 @@ class BertLayer(nn.Module):
 
     def forward(self, inputs):
         result = self.bert(**inputs)
-        print(result)
         return result['last_hidden_state']
 
 # # Example usage:
