@@ -99,11 +99,11 @@ def evaluate_beam(input_document, n_best, k_beam, transformer):
     decoded_batch.append(best_hypotheses)
     return decoded_batch
 
-def train_step(inp_input_ids,inp_token_type_ids,inp_attention_mask, tar_input_ids, transformer, optimizer, scheduler):
+def train_step(inp_input_ids, inp_token_type_ids, inp_attention_mask, tar_input_ids, transformer, optimizer, scheduler):
     tar_real = tar_input_ids
     enc_padding_mask, combined_mask, dec_padding_mask = create_masks(inp_input_ids, tar_input_ids)
     predictions, enc_output, att_weights = transformer(
-        inp_input_ids,inp_token_type_ids,inp_attention_mask, tar_input_ids, 
+        inp_input_ids, inp_token_type_ids, inp_attention_mask, tar_input_ids, 
         enc_padding_mask, 
         combined_mask, 
         dec_padding_mask,
