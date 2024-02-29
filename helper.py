@@ -112,12 +112,12 @@ def create_look_ahead_mask(size):
 def create_masks(inp, tar):
     enc_padding_mask = create_padding_mask(inp)
     dec_padding_mask = create_padding_mask(inp)
-    print(enc_padding_mask.is_cuda())
-    print(dec_padding_mask.is_cuda())
+    print(enc_padding_mask.is_cuda)
+    print(dec_padding_mask.is_cuda)
     look_ahead_mask = create_look_ahead_mask(tar.size(1))
-    print(look_ahead_mask.is_cuda())
+    print(look_ahead_mask.is_cuda)
     dec_target_padding_mask = create_padding_mask(tar)
-    print(dec_target_padding_mask.is_cuda())
+    print(dec_target_padding_mask.is_cuda)
 
     combined_mask = torch.max(dec_target_padding_mask, look_ahead_mask)
     return enc_padding_mask, combined_mask, dec_padding_mask
