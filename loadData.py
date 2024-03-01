@@ -70,8 +70,8 @@ def read_data(tokenizer, filetrain='train_pharagraph_full.jl', filetarget='targe
 
     # inputs = torch.nn.utils.rnn.pad_sequence([torch.tensor(d) for d in document_bert], batch_first=True, padding_value=tokenizer.pad_token_id)
     # targets = torch.nn.utils.rnn.pad_sequence([torch.tensor(d) for d in summary_bert], batch_first=True, padding_value=tokenizer.pad_token_id)
-    inputs = tokenizer(doc_list, return_tensors="pt", padding=True, max_length = encoder_maxlen, truncation = True, add_special_tokens= True)
-    targets = tokenizer(sum_list, return_tensors="pt", padding=True, max_length = decoder_maxlen, truncation = True, add_special_tokens= True)
+    inputs = tokenizer.batch_encode_plus(doc_list, return_tensors="pt", padding=True, max_length = encoder_maxlen, truncation = True, add_special_tokens= True)
+    targets = tokenizer.batch_encode_plus(sum_list, return_tensors="pt", padding=True, max_length = decoder_maxlen, truncation = True, add_special_tokens= True)
 
     dataset = MyDataset(inputs, targets)
     dataloader = torch.utils.data.DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True)
