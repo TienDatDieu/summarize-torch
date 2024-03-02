@@ -163,8 +163,6 @@ if __name__ == "__main__":
     scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lambda epoch: epoch/10)
     
 
-
-
     val_input, val_output = train(transformer, optimizer=optimizer, scheduler=scheduler)
     for input_document in val_input:
         result_beam = evaluate_beam(input_document, 3, 3, transformer)
