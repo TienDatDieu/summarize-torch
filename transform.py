@@ -72,9 +72,10 @@ class TransformerModel(nn.Module):
         tar["input_ids"] = tar_input_ids
 
         enc_output = self.encoder(inp)
-        dec_output, attention_weights = self.decoder(tar_input_ids, enc_output["input_ids"], look_ahead_mask, dec_padding_mask)
+        dec_output, attention_weights = self.decoder(tar_input_ids, enc_output, look_ahead_mask, dec_padding_mask)
         
         final_output = self.final_layer(dec_output)
+        print("final_output shape", final_output.shape)
         full_topic = []
         a_topic = []
         a = []

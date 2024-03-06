@@ -22,7 +22,7 @@ class Decoder(nn.Module):
         attention_weights = {}
         x = self.embedding(x)
         x *= torch.sqrt(torch.tensor(self.d_model, dtype=torch.float32))
-        x += self.pos_encoding[:, :seq_len, :]
+        x += self.pos_encoding[:, :seq_len, :].cuda()
         x = self.dropout(x)
 
         for i in range(self.num_layers):

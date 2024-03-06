@@ -7,3 +7,4 @@ word2Topic_v1.jl
 word2Topic_v2.jl
 word2Topic.jl
 list_topic_count.jl
+lda_model.jl
