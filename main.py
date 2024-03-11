@@ -10,10 +10,12 @@ from helper import *
 from log_manager import *
 from queue import PriorityQueue
 
-from transformers import AutoTokenizer, AutoModelForMaskedLM
+from transformers import AutoTokenizer
 from transformers import BertModel
 tokenizer = AutoTokenizer.from_pretrained("vinai/phobert-base-v2")
 model = BertModel.from_pretrained("vinai/phobert-base-v2")
+
+lda_model = joblib.load('../input/summarize-dataset/lda_model.jl')
 
 
 train_loss = []
@@ -100,7 +102,7 @@ def evaluate_beam(input_document, n_best, k_beam, transformer):
     decoded_batch.append(best_hypotheses)
     return decoded_batch
 
-def train_step(inp_input_ids, inp_token_type_ids, inp_attention_mask, tar_input_ids, transformer, optimizer, scheduler):
+def train_step(inp_input_ids, inp_token_type_ids, inp_attention_mask, tar_input_ids, target_vocab_size, transformer, optimizer, scheduler):
     tar_real = tar_input_ids
     enc_padding_mask, combined_mask, dec_padding_mask = create_masks(inp_input_ids, tar_input_ids)
     predictions, enc_output, att_weights = transformer(
@@ -108,8 +110,12 @@ def train_step(inp_input_ids, inp_token_type_ids, inp_attention_mask, tar_input_
         enc_padding_mask, 
         combined_mask, 
         dec_padding_mask,
+        target_vocab_size,
+        lda_model
     )
-    loss = loss_function(tar_real, predictions)
+    print("prediction",predictions.shape)
+    print("tar_real" ,tar_real.shape)
+    loss = loss_function(tar_real, predictions, target_vocab_size)
 
     optimizer.zero_grad()
     loss.backward()
@@ -118,7 +124,7 @@ def train_step(inp_input_ids, inp_token_type_ids, inp_attention_mask, tar_input_
 
     train_loss.append(loss.item())
 
-def train(transformer, optimizer, scheduler):
+def train(transformer,decoder_vocab_size, optimizer, scheduler):
     dataset, val_input, val_output = read_data(tokenizer)
 
     for epoch in range(EPOCHS):
@@ -127,7 +133,7 @@ def train(transformer, optimizer, scheduler):
         train_loss.clear()
         for batch, row in enumerate(dataset):
             inp_input_ids,inp_token_type_ids,inp_attention_mask, tar_input_ids = row['inp_input_ids'].to(device), row['inp_token_type_ids'].to(device), row['inp_attention_mask'].to(device), row['tar_input_ids'].to(device)
-            train_step( inp_input_ids.to(device), inp_token_type_ids.to(device), inp_attention_mask.to(device), tar_input_ids.to(device) , transformer, optimizer, scheduler)
+            train_step( inp_input_ids.to(device), inp_token_type_ids.to(device), inp_attention_mask.to(device), tar_input_ids.to(device) ,decoder_vocab_size,  transformer, optimizer, scheduler)
             if batch > 0 and batch % 1000 == 0:
                 print('Batch {} Loss {:.4f}'.format(batch, sum(train_loss) / len(train_loss)))
         print('Epoch {} Loss {:.4f}'.format(epoch, sum(train_loss) / len(train_loss)))
@@ -137,22 +143,16 @@ def train(transformer, optimizer, scheduler):
     return val_input, val_output
 
 if __name__ == "__main__":
-    word2Topic = joblib.load('word2Topic_v2.jl')
-    list_topic_count = joblib.load('list_topic_count.jl')
 
-    encoder_vocab_size = tokenizer.vocab_size
-    decoder_vocab_size = tokenizer.vocab_size
+    encoder_vocab_size = len(tokenizer.get_vocab().keys())
+    decoder_vocab_size = len(tokenizer.get_vocab().keys())
     transformer = TransformerModel(
         num_layers, 
         d_model, 
         num_heads, 
         dff,
-        encoder_vocab_size, 
         decoder_vocab_size, 
-        pe_input=encoder_vocab_size, 
         pe_target=decoder_vocab_size,
-        word2Topic=word2Topic,
-        list_topic_count=list_topic_count,
         bert=model
     ).to(device)
 
@@ -163,7 +163,7 @@ if __name__ == "__main__":
     scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lambda epoch: epoch/10)
     
 
-    val_input, val_output = train(transformer, optimizer=optimizer, scheduler=scheduler)
+    val_input, val_output = train(transformer, decoder_vocab_size,  optimizer=optimizer, scheduler=scheduler)
     for input_document in val_input:
         result_beam = evaluate_beam(input_document, 3, 3, transformer)
         

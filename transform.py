@@ -6,7 +6,8 @@ from bertLayer import BertLayer
 from encoder import Encoder
 from decoder import Decoder
 from log_manager import logger
-
+from sklearn import preprocessing
+from scipy import sparse
 class MultiHeadAttention(nn.Module):
     def __init__(self, d_model, num_heads):
         super(MultiHeadAttention, self).__init__()
@@ -50,20 +51,29 @@ class MultiHeadAttention(nn.Module):
         output = self.dense(output)
         return output, attention_weights
 
+def processing_LDA(tokens, vocab_length, lda_model):
+    word_dist_for_topic = []
+    for tok in tokens:
+        net_tokens = [0] * vocab_length
+        for k in tok[1:-2]:
+            net_tokens[k] = 1
+        topic_probability_scores = lda_model.transform(sparse.csr_matrix(net_tokens))
+        topic_indice = list(topic_probability_scores[0]).index(max(topic_probability_scores[0]))
+        word_dist_for_topic_raw = lda_model.components_[topic_indice] * topic_probability_scores[0][topic_indice]
+        word_dist_for_topic.append(preprocessing.normalize([word_dist_for_topic_raw]))
+    return word_dist_for_topic
+
 
 class TransformerModel(nn.Module):
-    def __init__(self, num_layers, d_model, num_heads, dff, input_vocab_size, target_vocab_size, pe_input, pe_target, word2Topic, list_topic_count, bert, rate=0.1):
+    def __init__(self, num_layers, d_model, num_heads, dff, target_vocab_size, pe_target, bert, rate=0.1):
         super(TransformerModel, self).__init__()
 
         self.encoder = BertLayer(bert)
         self.decoder = Decoder(num_layers, d_model, num_heads, dff, target_vocab_size, pe_target, rate)
 
         self.final_layer = nn.Linear(d_model, target_vocab_size)
-
-        self.word2Topic = word2Topic
-        self.list_topic_count = list_topic_count
     
-    def forward(self, inp_input_ids,inp_token_type_ids,inp_attention_mask, tar_input_ids, enc_padding_mask, look_ahead_mask, dec_padding_mask, alpha=0):
+    def forward(self, inp_input_ids,inp_token_type_ids,inp_attention_mask, tar_input_ids, enc_padding_mask, look_ahead_mask, dec_padding_mask, target_vocab_size, lda_model , alpha=0.1):
         inp = dict()
         inp["input_ids"] = inp_input_ids
         inp["token_type_ids"] = inp_token_type_ids
@@ -75,22 +85,28 @@ class TransformerModel(nn.Module):
         dec_output, attention_weights = self.decoder(tar_input_ids, enc_output, look_ahead_mask, dec_padding_mask)
         
         final_output = self.final_layer(dec_output)
-        print("final_output shape", final_output.shape)
-        full_topic = []
-        a_topic = []
-        a = []
-        for e in inp.detach().numpy():
-            a = np.zeros(18)
-            for el in e:
-                a = a + self.word2Topic[int(el)]
-            a_topic.append(a/300)
-        full_topic.append(a_topic)
-       
-        topic_arg1 = torch.matmul(torch.tile(self.word2Topic.unsqueeze(0), (final_output.shape[0], 1, 1)), 
-                                  torch.reshape(full_topic, (final_output.shape[0], 18, 1)).float())
-        topic_arg2 = torch.tile(torch.reshape(topic_arg1, (topic_arg1.shape[0], 1 , topic_arg1.shape[1])), 
-                                [1, final_output.shape[1], 1])
+
+
+        word_dist_for_topic = processing_LDA(inp_input_ids,vocab_length=target_vocab_size,lda_model=lda_model)
+        word_dist_for_topic = torch.Tensor(word_dist_for_topic).cuda()
         
-        topic_arg3 =  topic_arg2 / torch.max(topic_arg2)
-        sum_all = final_output * (1-alpha) + alpha*topic_arg3
+        # full_topic = []
+        # a_topic = []
+        # a = []
+
+        # for e in inp.detach().numpy():
+        #     a = np.zeros(18)
+        #     for el in e:
+        #         a = a + self.word2Topic[int(el)]
+        #     a_topic.append(a/300)
+        # full_topic.append(a_topic)
+       
+        # topic_arg1 = torch.matmul(torch.tile(word_dist_for_topic.unsqueeze(1), (1, final_output.shape[1], 1)), 
+        #                           torch.reshape(full_topic, (final_output.shape[0], 18, 1)).float())
+        # topic_arg2 = torch.tile(torch.reshape(topic_arg1, (topic_arg1.shape[0], 1 , topic_arg1.shape[1])), 
+        #                         [1, final_output.shape[1], 1])
+        
+        # topic_arg3 =  topic_arg2 / torch.max(topic_arg2)
+
+        sum_all = final_output * (1-alpha) + alpha*word_dist_for_topic
         return sum_all, enc_output, attention_weights
