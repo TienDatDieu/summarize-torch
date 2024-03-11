@@ -113,8 +113,6 @@ def train_step(inp_input_ids, inp_token_type_ids, inp_attention_mask, tar_input_
         target_vocab_size,
         lda_model
     )
-    print("prediction",predictions.shape)
-    print("tar_real" ,tar_real.shape)
     loss = loss_function(tar_real, predictions, target_vocab_size)
 
     optimizer.zero_grad()
