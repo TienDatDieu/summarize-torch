@@ -40,7 +40,7 @@ def read_data(tokenizer, filetrain='train_pharagraph_full.jl', filetarget='targe
         ele = re.sub(r'[\W_]', ' ', ele)
         ele = re.sub(r'[^\w\s]', '', ele)
         ele = re.sub(r'\t\n', '', ele)
-        targets.append(ele)
+        targets_input.append(ele)
 
     training_input = []
     for ele in train_pharagraph:
