@@ -35,7 +35,7 @@ def read_data(tokenizer, filetrain='train_pharagraph_full.jl', filetarget='targe
     train_pharagraph = joblib.load(filetrain)
     target_strings = joblib.load(filetarget)
 
-    targets = []
+    targets_input = []
     for ele in target_strings:
         ele = re.sub(r'[\W_]', ' ', ele)
         ele = re.sub(r'[^\w\s]', '', ele)
@@ -70,10 +70,15 @@ def read_data(tokenizer, filetrain='train_pharagraph_full.jl', filetarget='targe
 
     # inputs = torch.nn.utils.rnn.pad_sequence([torch.tensor(d) for d in document_bert], batch_first=True, padding_value=tokenizer.pad_token_id)
     # targets = torch.nn.utils.rnn.pad_sequence([torch.tensor(d) for d in summary_bert], batch_first=True, padding_value=tokenizer.pad_token_id)
-    inputs = tokenizer.batch_encode_plus(training_input, return_tensors="pt", padding=True, max_length = encoder_maxlen, truncation = True, add_special_tokens= True)
-    targets = tokenizer.batch_encode_plus(targets, return_tensors="pt", padding=True, max_length = decoder_maxlen, truncation = True, add_special_tokens= True)
-
-    dataset = MyDataset(inputs[:50000], targets[:50000])
+    inputs = tokenizer.batch_encode_plus(training_input[:50000], return_tensors="pt", padding=True, max_length = encoder_maxlen, truncation = True, add_special_tokens= True)
+    targets = tokenizer.batch_encode_plus(targets_input[:50000], return_tensors="pt", padding=True, max_length = decoder_maxlen, truncation = True, add_special_tokens= True)
+    val_inputs = tokenizer.batch_encode_plus(training_input[50001:50101], return_tensors="pt", padding=True, max_length = encoder_maxlen, truncation = True, add_special_tokens= True)
+    val_targets = tokenizer.batch_encode_plus(targets_input[50001:50101], return_tensors="pt", padding=True, max_length = decoder_maxlen, truncation = True, add_special_tokens= True)
+    dataset = MyDataset(inputs, targets)
     dataloader = torch.utils.data.DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True)
+    del train_pharagraph
+    del target_strings
+    del training_input
+    del targets_input
 
-    return dataloader, inputs[50001:50101], targets[50001:50101]
+    return dataloader, val_inputs, val_targets
