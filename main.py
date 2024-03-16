@@ -12,6 +12,8 @@ from queue import PriorityQueue
 
 from transformers import AutoTokenizer
 from transformers import BertModel
+from torch.utils.data import Dataset
+import torch
 tokenizer = AutoTokenizer.from_pretrained("vinai/phobert-base-v2")
 model = BertModel.from_pretrained("vinai/phobert-base-v2")
 
@@ -102,6 +104,110 @@ def evaluate_beam(input_document, n_best, k_beam, transformer):
     decoded_batch.append(best_hypotheses)
     return decoded_batch
 
+class MyDataset(Dataset):
+    def __init__(self, inputs,targets):
+        super().__init__()
+        self.inputs = inputs
+        self.targets = targets
+
+    def __len__(self):
+        return len(self.inputs['input_ids'])
+    
+    def __getitem__(self, index):
+        inp_input_ids = self.inputs['input_ids'][index]
+        inp_token_type_ids = self.inputs['token_type_ids'][index]
+        inp_attention_mask = self.inputs['attention_mask'][index]
+        tar_input_ids = self.targets['input_ids'][index]
+
+        return {
+            'inp_input_ids' : inp_input_ids,
+            'inp_token_type_ids' : inp_token_type_ids,
+            'inp_attention_mask' : inp_attention_mask,
+            'tar_input_ids' : tar_input_ids
+        }
+
+import torch
+import torch.utils.data as tud
+from tqdm.auto import tqdm
+import warnings
+def beam_search(
+    model, 
+    input_document,
+    target_document,
+    lda_model,
+    predictions = 20,
+    beam_width = 5,
+    batch_size = 10, 
+    progress_bar = 0
+):
+    with torch.no_grad():
+        X = input_document["input_ids"]
+        Y = torch.ones(target_document["input_ids"].shape[0], 1).to(next(model.parameters()).device).long()
+        
+#         Y = target_document["input_ids"]
+        inp_input_ids = input_document["input_ids"]
+        inp_token_type_ids = input_document["token_type_ids"]
+        inp_attention_mask = input_document["attention_mask"]
+        tar_input_ids = target_document["input_ids"]
+        target_vocab_size = len(tokenizer.get_vocab().keys())
+        enc_padding_mask, combined_mask, dec_padding_mask = create_masks(X, Y)
+        pre, enc_output, att_weights = model(
+            inp_input_ids, inp_token_type_ids, inp_attention_mask, tar_input_ids, 
+            enc_padding_mask, 
+            combined_mask, 
+            dec_padding_mask,
+            target_vocab_size,
+            lda_model
+            )
+        next_probabilities = pre[:, -1, :]
+        vocabulary_size = next_probabilities.shape[-1]
+        probabilities, next_chars = next_probabilities.squeeze().log_softmax(-1)\
+        .topk(k = beam_width, axis = -1)
+        Y = Y.repeat((beam_width, 1))
+        next_chars = next_chars.reshape(-1, 1)
+        Y = torch.cat((Y, next_chars), axis = -1)
+        predictions_iterator = range(predictions - 1)
+        if progress_bar > 0:
+            predictions_iterator = tqdm(predictions_iterator)
+        for i in predictions_iterator:
+            dataset = MyDataset(inputs, targets)
+            dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True)
+#             dataset = tud.TensorDataset(X.repeat((beam_width, 1, 1)).transpose(0, 1).flatten(end_dim = 1), Y)
+#             loader = tud.DataLoader(dataset, batch_size = batch_size)
+            next_probabilities = []
+            iterator = iter(dataloader)
+            if progress_bar > 1:
+                iterator = tqdm(iterator)
+            for x in iterator:
+                x["inp_input_ids"] = x["inp_input_ids"].repeat((beam_width, 1, 1)).transpose(0, 1).flatten(end_dim = 1)
+                x["inp_token_type_ids"] = x["inp_token_type_ids"].repeat((beam_width, 1, 1)).transpose(0, 1).flatten(end_dim = 1)
+                x["inp_attention_mask"] = x["inp_attention_mask"].repeat((beam_width, 1, 1)).transpose(0, 1).flatten(end_dim = 1)
+                x["tar_input_ids"]= x["tar_input_ids"].repeat((beam_width, 1, 1)).transpose(0, 1).flatten(end_dim = 1)
+                enc_padding_mask, combined_mask, dec_padding_mask = create_masks(x["inp_input_ids"], x["tar_input_ids"])
+                pre, enc_output, att_weights = model(
+                x["inp_input_ids"], x["inp_token_type_ids"], x["inp_attention_mask"], x["tar_input_ids"], 
+                enc_padding_mask, 
+                combined_mask, 
+                dec_padding_mask,
+                target_vocab_size,
+                lda_model
+                )
+                next_probabilities.append(pre[:, -1, :].log_softmax(-1))
+            print(next_probabilities[0].shape)
+            next_probabilities = torch.cat(next_probabilities, axis = 0)
+            next_probabilities = next_probabilities.reshape((-1, beam_width, next_probabilities.shape[-1]))
+            print(next_probabilities.shape)
+            print(probabilities.shape)
+            probabilities = probabilities.unsqueeze(-1) + next_probabilities
+            probabilities = probabilities.flatten(start_dim = 1)
+            probabilities, idx = probabilities.topk(k = beam_width, axis = -1)
+            next_chars = torch.remainder(idx, vocabulary_size).flatten().unsqueeze(-1)
+            best_candidates = (idx / vocabulary_size).long()
+            best_candidates += torch.arange(Y.shape[0] // beam_width, device = X.device).unsqueeze(-1) * beam_width
+            Y = Y[best_candidates].flatten(end_dim = -2)
+            Y = torch.cat((Y, next_chars), axis = 1)
+        return Y.reshape(-1, beam_width, Y.shape[-1]), probabilities
+
 def train_step(inp_input_ids, inp_token_type_ids, inp_attention_mask, tar_input_ids, target_vocab_size, transformer, optimizer, scheduler):
     tar_real = tar_input_ids
     enc_padding_mask, combined_mask, dec_padding_mask = create_masks(inp_input_ids, tar_input_ids)
@@ -121,9 +227,10 @@ def train_step(inp_input_ids, inp_token_type_ids, inp_attention_mask, tar_input_
     scheduler.step()
 
     train_loss.append(loss.item())
+    return train_loss
 
 def train(transformer,decoder_vocab_size, optimizer, scheduler):
-    dataset, val_input, val_output = read_data(tokenizer)
+    dataset, val_input, val_output = read_data(tokenizer, link_training_kaggle, link_target_kaggle)
 
     for epoch in range(EPOCHS):
         print("Epoch {}".format(epoch))
@@ -131,12 +238,12 @@ def train(transformer,decoder_vocab_size, optimizer, scheduler):
         train_loss.clear()
         for batch, row in enumerate(dataset):
             inp_input_ids,inp_token_type_ids,inp_attention_mask, tar_input_ids = row['inp_input_ids'].to(device), row['inp_token_type_ids'].to(device), row['inp_attention_mask'].to(device), row['tar_input_ids'].to(device)
-            train_step( inp_input_ids.to(device), inp_token_type_ids.to(device), inp_attention_mask.to(device), tar_input_ids.to(device) ,decoder_vocab_size,  transformer, optimizer, scheduler)
-            if batch > 0 and batch % 1000 == 0:
+            train_loss = train_step( inp_input_ids.to(device), inp_token_type_ids.to(device), inp_attention_mask.to(device), tar_input_ids.to(device) ,decoder_vocab_size,  transformer, optimizer, scheduler)
+            if batch > 0 and batch % 500 == 0:
                 print('Batch {} Loss {:.4f}'.format(batch, sum(train_loss) / len(train_loss)))
         print('Epoch {} Loss {:.4f}'.format(epoch, sum(train_loss) / len(train_loss)))
         print('Time taken for 1 epoch: {} secs\n'.format(time.time() - start))
-        if (epoch > 0 and epoch % 15 == 0):
+        if (epoch > 0 and epoch % 5 == 0):
             torch.save(transformer.state_dict(), f"checkpoints/transformer_epoch_{epoch}.pt")
     return val_input, val_output
 
@@ -162,15 +269,18 @@ if __name__ == "__main__":
     
 
     val_input, val_output = train(transformer, decoder_vocab_size,  optimizer=optimizer, scheduler=scheduler)
-    for input_document in val_input:
-        result_beam = evaluate_beam(input_document, 3, 3, transformer)
+    result_beam = beam_search(model.to(device), val_input.to(device), val_output.to(device),lda_model)
+    predict_sum = [tokenizer.batch_decode(k) for k in result_beam[0]]
+    print(predict_sum)
+    # for input_document in val_input:
+    #     result_beam = evaluate_beam(input_document, 3, 3, transformer)
         
-        for e in result_beam:
-            sentence_result = []
-            for i in e:
-                for s in i[1]:
-                    if isinstance(s, str):
-                        sentence_result.append(s)
-                    else:
-                        sentence_result.append(tokenizer.decode(s.numpy()))
-            print(sentence_result)
+    #     for e in result_beam:
+    #         sentence_result = []
+    #         for i in e:
+    #             for s in i[1]:
+    #                 if isinstance(s, str):
+    #                     sentence_result.append(s)
+    #                 else:
+    #                     sentence_result.append(tokenizer.decode(s.numpy()))
+    #         print(sentence_result)

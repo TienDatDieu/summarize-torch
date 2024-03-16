@@ -73,7 +73,7 @@ def read_data(tokenizer, filetrain='train_pharagraph_full.jl', filetarget='targe
     inputs = tokenizer.batch_encode_plus(training_input, return_tensors="pt", padding=True, max_length = encoder_maxlen, truncation = True, add_special_tokens= True)
     targets = tokenizer.batch_encode_plus(targets, return_tensors="pt", padding=True, max_length = decoder_maxlen, truncation = True, add_special_tokens= True)
 
-    dataset = MyDataset(inputs, targets)
+    dataset = MyDataset(inputs[:50000], targets[:50000])
     dataloader = torch.utils.data.DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True)
 
-    return dataloader, training_input, targets
+    return dataloader, inputs[50001:50101], targets[50001:50101]
