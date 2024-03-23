@@ -20,8 +20,6 @@ model = BertModel.from_pretrained("vinai/phobert-base-v2")
 lda_model = joblib.load('../input/summarize-dataset/lda_model.jl')
 
 
-train_loss = []
-
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 class BeamSearchNode(object):
@@ -170,7 +168,7 @@ def beam_search(
         if progress_bar > 0:
             predictions_iterator = tqdm(predictions_iterator)
         for i in predictions_iterator:
-            dataset = MyDataset(inputs, targets)
+            dataset = MyDataset(X, Y)
             dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True)
 #             dataset = tud.TensorDataset(X.repeat((beam_width, 1, 1)).transpose(0, 1).flatten(end_dim = 1), Y)
 #             loader = tud.DataLoader(dataset, batch_size = batch_size)
@@ -210,6 +208,9 @@ def beam_search(
 
 def train_step(inp_input_ids, inp_token_type_ids, inp_attention_mask, tar_input_ids, target_vocab_size, transformer, optimizer, scheduler):
     tar_real = tar_input_ids
+    
+    optimizer.zero_grad()
+
     enc_padding_mask, combined_mask, dec_padding_mask = create_masks(inp_input_ids, tar_input_ids)
     predictions, enc_output, att_weights = transformer(
         inp_input_ids, inp_token_type_ids, inp_attention_mask, tar_input_ids, 
@@ -221,30 +222,31 @@ def train_step(inp_input_ids, inp_token_type_ids, inp_attention_mask, tar_input_
     )
     loss = loss_function(tar_real, predictions, target_vocab_size)
 
-    optimizer.zero_grad()
     loss.backward()
     optimizer.step()
-    scheduler.step()
+    # scheduler.step()
 
-    train_loss.append(loss.item())
-    return train_loss
+    return loss.item()
 
 def train(transformer,decoder_vocab_size, optimizer, scheduler):
     dataset, val_input, val_output = read_data(tokenizer, link_training_kaggle, link_target_kaggle)
-
+    train_loss = []
     for epoch in range(EPOCHS):
         print("Epoch {}".format(epoch))
         start = time.time()
         train_loss.clear()
+        scheduler.step()
         for batch, row in enumerate(dataset):
             inp_input_ids,inp_token_type_ids,inp_attention_mask, tar_input_ids = row['inp_input_ids'].to(device), row['inp_token_type_ids'].to(device), row['inp_attention_mask'].to(device), row['tar_input_ids'].to(device)
-            train_loss = train_step( inp_input_ids.to(device), inp_token_type_ids.to(device), inp_attention_mask.to(device), tar_input_ids.to(device) ,decoder_vocab_size,  transformer, optimizer, scheduler)
+            loss = train_step( inp_input_ids.to(device), inp_token_type_ids.to(device), inp_attention_mask.to(device), tar_input_ids.to(device) ,decoder_vocab_size,  transformer, optimizer, scheduler)
+            train_loss.append(loss)
             if batch > 0 and batch % 500 == 0:
                 print('Batch {} Loss {:.4f}'.format(batch, sum(train_loss) / len(train_loss)))
         print('Epoch {} Loss {:.4f}'.format(epoch, sum(train_loss) / len(train_loss)))
         print('Time taken for 1 epoch: {} secs\n'.format(time.time() - start))
         if (epoch > 0 and epoch % 5 == 0):
             torch.save(transformer.state_dict(), f"checkpoints/transformer_epoch_{epoch}.pt")
+        
     return val_input, val_output
 
 if __name__ == "__main__":
@@ -262,7 +264,7 @@ if __name__ == "__main__":
     ).to(device)
 
     
-    optimizer = torch.optim.Adam(transformer.parameters(), lr=0.001, betas=(0.9, 0.98), eps=1e-9)
+    optimizer = torch.optim.Adam(transformer.parameters(), lr=1e-5, betas=(0.9, 0.98), eps=1e-9)
     learning_rate = CustomSchedule(optimizer, d_model)
     logging.info(f"learning rate - {learning_rate}")
     scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lambda epoch: epoch/10)

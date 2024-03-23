@@ -88,7 +88,7 @@ class TransformerModel(nn.Module):
 
 
         word_dist_for_topic = processing_LDA(inp_input_ids,vocab_length=target_vocab_size,lda_model=lda_model)
-        word_dist_for_topic = torch.Tensor(word_dist_for_topic).cuda()
+        word_dist_for_topic = torch.Tensor(np.array(word_dist_for_topic)).cuda()
         
         # full_topic = []
         # a_topic = []
