@@ -12,5 +12,4 @@ class CustomSchedule(torch.optim.lr_scheduler._LRScheduler):
         step = torch.tensor(step, dtype=torch.float32)
         arg1 = torch.rsqrt(step)
         arg2 = step * (self.warmup_steps ** -1.5)
-
         return [float(torch.rsqrt(self.d_model) * min(arg1, arg2))]

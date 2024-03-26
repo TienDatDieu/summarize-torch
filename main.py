@@ -191,11 +191,8 @@ def beam_search(
                 lda_model
                 )
                 next_probabilities.append(pre[:, -1, :].log_softmax(-1))
-            print(next_probabilities[0].shape)
             next_probabilities = torch.cat(next_probabilities, axis = 0)
             next_probabilities = next_probabilities.reshape((-1, beam_width, next_probabilities.shape[-1]))
-            print(next_probabilities.shape)
-            print(probabilities.shape)
             probabilities = probabilities.unsqueeze(-1) + next_probabilities
             probabilities = probabilities.flatten(start_dim = 1)
             probabilities, idx = probabilities.topk(k = beam_width, axis = -1)
@@ -206,7 +203,7 @@ def beam_search(
             Y = torch.cat((Y, next_chars), axis = 1)
         return Y.reshape(-1, beam_width, Y.shape[-1]), probabilities
 
-def train_step(inp_input_ids, inp_token_type_ids, inp_attention_mask, tar_input_ids, target_vocab_size, transformer, optimizer, scheduler):
+def train_step(inp_input_ids, inp_token_type_ids, inp_attention_mask, tar_input_ids, tar_attention_mask, target_vocab_size, transformer, optimizer, scheduler):
     tar_real = tar_input_ids
     
     optimizer.zero_grad()
@@ -220,11 +217,11 @@ def train_step(inp_input_ids, inp_token_type_ids, inp_attention_mask, tar_input_
         target_vocab_size,
         lda_model
     )
-    loss = loss_function(tar_real, predictions, target_vocab_size)
+    loss = loss_function(tar_real, tar_attention_mask, predictions, target_vocab_size)
 
     loss.backward()
     optimizer.step()
-    # scheduler.step()
+    scheduler.step()
 
     return loss.item()
 
@@ -235,10 +232,10 @@ def train(transformer,decoder_vocab_size, optimizer, scheduler):
         print("Epoch {}".format(epoch))
         start = time.time()
         train_loss.clear()
-        scheduler.step()
+        # scheduler.step()
         for batch, row in enumerate(dataset):
-            inp_input_ids,inp_token_type_ids,inp_attention_mask, tar_input_ids = row['inp_input_ids'].to(device), row['inp_token_type_ids'].to(device), row['inp_attention_mask'].to(device), row['tar_input_ids'].to(device)
-            loss = train_step( inp_input_ids.to(device), inp_token_type_ids.to(device), inp_attention_mask.to(device), tar_input_ids.to(device) ,decoder_vocab_size,  transformer, optimizer, scheduler)
+            inp_input_ids,inp_token_type_ids,inp_attention_mask, tar_input_ids, tar_attention_mask = row['inp_input_ids'].to(device), row['inp_token_type_ids'].to(device), row['inp_attention_mask'].to(device), row['tar_input_ids'].to(device), row['tar_attention_mask'].to(device)
+            loss = train_step( inp_input_ids.to(device), inp_token_type_ids.to(device), inp_attention_mask.to(device), tar_input_ids.to(device), tar_attention_mask.to(device) ,decoder_vocab_size,  transformer, optimizer, scheduler)
             train_loss.append(loss)
             if batch > 0 and batch % 500 == 0:
                 print('Batch {} Loss {:.4f}'.format(batch, sum(train_loss) / len(train_loss)))

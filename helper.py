@@ -60,14 +60,13 @@ def beam_search_decoder(predictions, top_k=3):
 
     return output_sequences
 
-def loss_function(real, pred, vocab_size):
-    loss_object = nn.CrossEntropyLoss()
-    # mask = (real != 0)
+def loss_function(real, attention_mask, pred, vocab_size):
+    loss_object = nn.CrossEntropyLoss(weight=None, size_average=None, ignore_index=-100, reduce=False, reduction='mean', label_smoothing=0.0)
     loss_ = loss_object(torch.swapaxes(pred, 1, 2), real)
     # mask = mask.float()
-    # loss_ *= mask 
-    # final_loss = torch.sum(loss_) / torch.sum(mask)
-    return loss_
+    loss_ *= attention_mask
+    final_loss = torch.sum(loss_) / torch.sum(attention_mask)
+    return final_loss
 
 def evaluate(input_document, tokenizer, encoder_maxlen, decoder_maxlen, transformer):
     input_document = tokenizer.special_tokens_map['cls_token'] + input_document + tokenizer.special_tokens_map['sep_token']
