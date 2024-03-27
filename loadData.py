@@ -18,9 +18,9 @@ class MyDataset(Dataset):
         inp_input_ids = self.inputs['input_ids'][index]
         inp_token_type_ids = self.inputs['token_type_ids'][index]
         inp_attention_mask = self.inputs['attention_mask'][index]
-        tar_input_ids = self.targets['input_ids'][index]
-        tar_token_type_ids = self.targets['token_type_ids'][index]
-        tar_attention_mask = self.targets['attention_mask'][index]
+        tar_input_ids = self.targets['input_ids'][index,1:]
+        tar_token_type_ids = self.targets['token_type_ids'][index,1:]
+        tar_attention_mask = self.targets['attention_mask'][index,1:]
 
         return {
             'inp_input_ids' : inp_input_ids,

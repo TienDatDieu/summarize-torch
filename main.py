@@ -178,30 +178,7 @@ class CosineDecayWithWarmUpScheduler(object):
 #     decoded_batch.append(best_hypotheses)
 #     return decoded_batch
 
-class MyDataset(Dataset):
-    def __init__(self, inputs,targets):
-        super().__init__()
-        self.inputs = inputs
-        self.targets = targets
-
-    def __len__(self):
-        return len(self.inputs['input_ids'])
-    
-    def __getitem__(self, index):
-        inp_input_ids = self.inputs['input_ids'][index]
-        inp_token_type_ids = self.inputs['token_type_ids'][index]
-        inp_attention_mask = self.inputs['attention_mask'][index]
-        tar_input_ids = self.targets['input_ids'][index]
-
-        return {
-            'inp_input_ids' : inp_input_ids,
-            'inp_token_type_ids' : inp_token_type_ids,
-            'inp_attention_mask' : inp_attention_mask,
-            'tar_input_ids' : tar_input_ids
-        }
-
 import torch
-import torch.utils.data as tud
 from tqdm.auto import tqdm
 def beam_search(
     model, 
