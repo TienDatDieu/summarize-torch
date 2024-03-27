@@ -1,4 +1,3 @@
-import torch
 from loadData import read_data 
 from config import *
 import joblib
@@ -6,12 +5,11 @@ import time
 from transform import TransformerModel 
 from helper import *
 from log_manager import *
-from queue import PriorityQueue
-
+from loadData import MyDataset
 from transformers import AutoTokenizer
 from transformers import BertModel
-from torch.utils.data import Dataset
 import torch
+import math
 
 tokenizer = AutoTokenizer.from_pretrained("vinai/phobert-base-v2")
 model = BertModel.from_pretrained("vinai/phobert-base-v2")
