@@ -339,7 +339,7 @@ if __name__ == "__main__":
     ).to(device)
 
     
-    optimizer = torch.optim.Adam(transformer.parameters(), lr=1e-6, betas=(0.9, 0.98), eps=1e-9)
+    optimizer = torch.optim.Adam(transformer.parameters(), lr=1e-4, betas=(0.9, 0.98), eps=1e-9)
     # learning_rate = CustomSchedule(optimizer, d_model)
     # logging.info(f"learning rate - {learning_rate}")
     # scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lambda epoch: epoch/10)
