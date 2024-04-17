@@ -267,6 +267,18 @@ def train_step(inp_input_ids, inp_token_type_ids, inp_attention_mask, tar_input_
         target_vocab_size,
         lda_model
     )
+    desired_output = [tokenizer.decode(k) if tokenizer.decode(k) else '' for k in tar_real]
+    predict_output = [tokenizer.batch_decode(k) for k in predictions]
+
+    intersection = 0
+    for idx, item in enumerate(predict_output):
+      if item == desired_output[idx]:
+        intersection += 1
+    precision = intersection/len(desired_output)
+    recall = intersection/len(predict_output)
+
+    print(precision)
+    print(recall)
     loss = loss_function(tar_real, tar_attention_mask, predictions, target_vocab_size)
 
     loss.backward()
