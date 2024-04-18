@@ -218,7 +218,7 @@ def beam_search(
         if progress_bar > 0:
             predictions_iterator = tqdm(predictions_iterator)
         for i in predictions_iterator:
-            dataset = MyDataset(X, Y)
+            dataset = MyDataset(input_document, target_document)
             dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True)
 #             dataset = tud.TensorDataset(X.repeat((beam_width, 1, 1)).transpose(0, 1).flatten(end_dim = 1), Y)
 #             loader = tud.DataLoader(dataset, batch_size = batch_size)
@@ -267,9 +267,11 @@ def train_step(inp_input_ids, inp_token_type_ids, inp_attention_mask, tar_input_
         target_vocab_size,
         lda_model
     )
-    desired_output = [tokenizer.decode(k) if tokenizer.decode(k) else '' for k in tar_real]
+    desired_output = [tokenizer.decode(k) if tokenizer.decode(k)!='<s>' and tokenizer.decode(k)!='</s>' and tokenizer.decode(k)!='<pad>'  else '' for k in tar_real]
     predict_output = [tokenizer.batch_decode(k) for k in predictions]
-
+    predict_output = predict_output[:len(desired_output)]
+    print("Target:", desired_output)
+    print("Predict:", predict_output)
     intersection = 0
     for idx, item in enumerate(predict_output):
       if item == desired_output[idx]:
@@ -277,8 +279,8 @@ def train_step(inp_input_ids, inp_token_type_ids, inp_attention_mask, tar_input_
     precision = intersection/len(desired_output)
     recall = intersection/len(predict_output)
 
-    print(precision)
-    print(recall)
+    print("Precision:", precision)
+    print("Recall:", recall)
     loss = loss_function(tar_real, tar_attention_mask, predictions, target_vocab_size)
 
     loss.backward()
@@ -326,14 +328,25 @@ if __name__ == "__main__":
     ).to(device)
 
     
-    optimizer = torch.optim.Adam(transformer.parameters(), lr=1e-4, betas=(0.9, 0.98), eps=1e-9)
+    optimizer = torch.optim.AdamW(transformer.parameters(), lr=1e-3, betas=(0.9, 0.98), eps=1e-9)
     # learning_rate = CustomSchedule(optimizer, d_model)
     # logging.info(f"learning rate - {learning_rate}")
     # scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lambda epoch: epoch/10)
     
 
     val_input, val_output = train(transformer, decoder_vocab_size,  optimizer=optimizer)
-    result_beam = beam_search(model.to(device), val_input.to(device), val_output.to(device),lda_model)
+    
+    model_test = TransformerModel(
+    num_layers, 
+    d_model, 
+    num_heads, 
+    dff,
+    decoder_vocab_size, 
+    pe_target=decoder_vocab_size,
+    bert=model
+    )
+    model_test = transformer
+    result_beam = beam_search(model_test.to(device), val_input.to(device), val_output.to(device),lda_model)
     predict_sum = [tokenizer.batch_decode(k) for k in result_beam[0]]
     print(predict_sum)
     # for input_document in val_input:
