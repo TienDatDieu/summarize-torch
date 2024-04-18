@@ -267,9 +267,9 @@ def train_step(inp_input_ids, inp_token_type_ids, inp_attention_mask, tar_input_
         target_vocab_size,
         lda_model
     )
-    desired_output = [tokenizer.decode(k) if tokenizer.decode(k)!='<s>' and tokenizer.decode(k)!='</s>' and tokenizer.decode(k)!='<pad>'  else '' for k in tar_real]
+    desired_output = [tokenizer.decode(k) for k in tar_real]
     predict_output = [tokenizer.batch_decode(k) for k in predictions]
-    predict_output = predict_output[:len(desired_output)]
+    predict_output = [x[:len(o)] for x, o in zip(predict_output,desired_output)]
     print("Target:", desired_output)
     print("Predict:", predict_output)
     intersection = 0
