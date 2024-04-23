@@ -278,7 +278,7 @@ def train_step(inp_input_ids, inp_token_type_ids, inp_attention_mask, tar_input_
     precision = intersection/len(desired_output)
     recall = intersection/len(predict_output)
 
-    loss = loss_function(tar_real, tar_attention_mask, predictions, target_vocab_size)
+    loss = loss_function(tar_real[:,1:,], tar_attention_mask, predictions, target_vocab_size)
 
     loss.backward()
     optimizer.step()

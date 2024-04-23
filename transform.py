@@ -79,7 +79,7 @@ class TransformerModel(nn.Module):
         inp["token_type_ids"] = inp_token_type_ids
         inp["attention_mask"] = inp_attention_mask
         tar = dict()
-        tar["input_ids"] = tar_input_ids
+        tar["input_ids"] = tar_input_ids[:,:-1,:]
 
         enc_output = self.encoder(inp)
         dec_output, attention_weights = self.decoder(tar_input_ids, enc_output, look_ahead_mask, dec_padding_mask)
