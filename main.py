@@ -270,7 +270,7 @@ def train_step(inp_input_ids, inp_token_type_ids, inp_attention_mask, tar_input_
     desired_output = [tokenizer.decode(k) for k in tar_real]
     predict_output = [tokenizer.batch_decode(k) for k in predictions]
     predict_output = [x[:len(o)] for x, o in zip(predict_output,desired_output)]
-
+    print(predict_output)
     intersection = 0
     for idx, item in enumerate(predict_output):
       if item == desired_output[idx]:
