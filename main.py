@@ -270,8 +270,7 @@ def train_step(inp_input_ids, inp_token_type_ids, inp_attention_mask, tar_input_
     desired_output = [tokenizer.decode(k) for k in tar_real]
     predict_output = [tokenizer.batch_decode(k) for k in predictions]
     predict_output = [x[:len(o)] for x, o in zip(predict_output,desired_output)]
-    print("Target:", desired_output)
-    print("Predict:", predict_output)
+
     intersection = 0
     for idx, item in enumerate(predict_output):
       if item == desired_output[idx]:
@@ -279,15 +278,13 @@ def train_step(inp_input_ids, inp_token_type_ids, inp_attention_mask, tar_input_
     precision = intersection/len(desired_output)
     recall = intersection/len(predict_output)
 
-    print("Precision:", precision)
-    print("Recall:", recall)
     loss = loss_function(tar_real, tar_attention_mask, predictions, target_vocab_size)
 
     loss.backward()
     optimizer.step()
     scheduler.step()
 
-    return loss.item()
+    return loss.item(), precision, recall
 
 def train(transformer,decoder_vocab_size, optimizer):
     dataset, val_input, val_output = read_data(tokenizer, link_training_kaggle, link_target_kaggle)
@@ -302,11 +299,11 @@ def train(transformer,decoder_vocab_size, optimizer):
         
         for batch, row in enumerate(dataset):
             inp_input_ids,inp_token_type_ids,inp_attention_mask, tar_input_ids, tar_attention_mask = row['inp_input_ids'].to(device), row['inp_token_type_ids'].to(device), row['inp_attention_mask'].to(device), row['tar_input_ids'].to(device), row['tar_attention_mask'].to(device)
-            loss = train_step( inp_input_ids.to(device), inp_token_type_ids.to(device), inp_attention_mask.to(device), tar_input_ids.to(device), tar_attention_mask.to(device) ,decoder_vocab_size,  transformer, optimizer, scheduler)
+            loss, precision, recall = train_step( inp_input_ids.to(device), inp_token_type_ids.to(device), inp_attention_mask.to(device), tar_input_ids.to(device), tar_attention_mask.to(device) ,decoder_vocab_size,  transformer, optimizer, scheduler)
             train_loss.append(loss)
             if batch > 0 and batch % 500 == 0:
                 print('Batch {} Loss {:.4f}'.format(batch, sum(train_loss) / len(train_loss)))
-        print('Epoch {} Loss {:.4f}'.format(epoch, sum(train_loss) / len(train_loss)))
+        print('Epoch {} Loss {:.4f} Precision {:4f} Recall {:4f}'.format(epoch, sum(train_loss) / len(train_loss), precision, recall))
         print('Time taken for 1 epoch: {} secs\n'.format(time.time() - start))
         if (epoch > 0 and epoch % 5 == 0):
             torch.save(transformer.state_dict(), f"checkpoints/transformer_epoch_{epoch}.pt")
